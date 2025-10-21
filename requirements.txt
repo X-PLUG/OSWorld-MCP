@@ -1,0 +1,5 @@
+pyautogui
+playwright
+pillow
+requests
+fastmcp
