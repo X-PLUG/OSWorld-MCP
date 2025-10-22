@@ -1,96 +1,74 @@
 # OSWorld-MCP: Benchmarking MCP Tool Invocation in Computer-Use Agents
 
-**OSWorld-MCP** is a benchmark for evaluating computer-use agents with integrated **MCP tool invocation** and **GUI operations** in real-world scenarios.
-
-- **158 validated MCP tools** across **7 common applications**
-- Covers **250 tasks** → **69%** tool-applicable
-- Includes **25 distractor tools** for robustness
-- Tasks feature **multi-round tool invocation** (up to 4 rounds)
-
-Full paper: [OSWorld-MCP: Benchmarking MCP Tool Invocation in Computer-Use Agents (TODO)](https://arxiv.org/abs/xxxx.xxxxx)
+## 🔔 Updates
+**2025-10-23:** We released our paper and project page! 🎉 
+*TODO* 
+📄 [Read the Paper](https://arxiv.org/abs/xxxx.xxxxx) &nbsp;|&nbsp; 🌐 [Visit the Project Page](https://os-world-mcp.github.io)
 
 ---
 
-## 📊 Leaderboard
+## 📑 Overview & Key Highlights
 
-### 15 Steps
+OSWorld-MCP is a comprehensive and fair benchmark for evaluating computer-use agents in real-world scenarios.  
+It jointly measures **Model Context Protocol (MCP)** tool invocation capabilities, **graphical user interface (GUI)** operation skills, and **decision-making** performance.  
+Designed as an extension of **OSWorld**, it significantly improves realism, balance, and comparability in evaluation.
 
-| Rank | Agent Model     | Accuracy (%) | TIR (%) | ACS  |
-| ---- | --------------- | ------------ | ------- | ---- |
-| 1    | Agent-S2.5      | **42.8**     | 28.2    | 10.2 |
-| 2    | Claude-4-Sonnet | **38.9**     | 31.9    | 10.6 |
-| 3    | Seed1.5-VL      | **34.8**     | 24.4    | 10.2 |
-| 4    | Gemini-2.5-Pro  | **23.8**     | 19.4    | 11.8 |
-| 5    | OpenAI o3       | **22.1**     | 17.4    | 12.1 |
-| 6    | Qwen2.5-VL      | **15.1**     | 11.4    | 13.7 |
+**Key Features & Findings**
+- **158 validated MCP tools**, spanning **7 common applications** (LibreOffice Writer, Calc, Impress, VS Code, Google Chrome, VLC, OS utilities). Among them, **25 distractor tools** for robustness testing
+- **250 tool-beneficial tasks** → 69% of benchmark tasks benefit from MCP tools
+- Multi-round tool invocation possible, posing real decision-making challenges
+- **MCP tools boost model accuracy & efficiency** — e.g., OpenAI o3: 8.3% → 20.4% (15 steps)
+- Highest observed Tool Invocation Rate (**TIR**) = 36.3% (Claude-4-Sonnet, 50 steps) → indicating ample room for improvement
+- MCP tools improve agent metrics
+- Higher tool invocation correlates with higher accuracy
+- Combining tools introduces significant challenges
 
-### 50 Steps
 
-| Rank | Agent Model     | Accuracy (%) | TIR (%) | ACS  |
-| ---- | --------------- | ------------ | ------- | ---- |
-| 1    | Agent-S2.5      | **51.4**     | 35.2    | 17.4 |
-| 2    | Claude-4-Sonnet | **43.8**     | 37.4    | 20.2 |
-| 3    | Seed1.5-VL      | **39.5**     | 29.6    | 23.0 |
-| 4    | Gemini-2.5-Pro  | **26.9**     | 21.9    | 29.9 |
-| 5    | OpenAI o3       | **23.8**     | 20.2    | 32.3 |
-| 6    | Qwen2.5-VL      | **13.6**     | 10.0    | 38.4 |
+
+**Architecture Overview**  
+
+![OSWorld-MCP Architecture](images/Fig2.png)  
+*Figure: OSWorld-MCP evaluation framework integrating GUI actions and MCP tool invocations.*
 
 ---
 
-## 📥 Installation & Usage
+## ⚙️ Installation & Usage
 
-### 1. Preparation: Code
-
-First, clone the original **OSWorld** repository and prepare the Docker image as per its documentation:
-
+### 1️⃣ Preparation: Code Setup
 ```bash
-# Clone OSWorld
+# Clone OSWorld base repo
 git clone https://github.com/xlang-ai/OSWorld.git
-```
 
-Then, clone **OSWorld-MCP**:
-
-```bash
 # Clone OSWorld-MCP
-git clone https://github.com/yourname/OSWorld-MCP.git
+git clone https://github.com/X-PLUG/OSWorld-MCP.git
 ```
-
-Replace the relevant files from **OSWorld-MCP** into the original OSWorld repository to enable MCP functionality.
+Integrate **OSWorld-MCP** files into OSWorld to enable MCP support.
 
 ---
 
-### 2. Preparation: Docker
-
-- Copy the files and directories in the `mcp` directory into the Docker image, placing them under the `/home` directory.
-
+### 2️⃣ Preparation: Docker Environment
+1. Copy MCP files into `/home` inside Docker:
 ```
 /home/
 └── mcp_server/
 └── osworld_mcp_client.py
 ```
-
-- Inside the Docker container, install dependencies to configure the **FastMCP** runtime environment:
-
+2. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
-
-- Install Node.js: https://nodejs.org/en/download/
-- Start the virtual machine and run:
-
+3. Install [Node.js](https://nodejs.org/en/download/)  
+4. Launch MCP server:
 ```bash
 cd mcp_server
 bash debug_server.sh
 ```
-
-If the browser launches the local debugging interface successfully, the environment is correctly configured.
+A successful launch opens the local MCP debug UI in your browser.
 
 ---
 
-### 3. Running the Evaluation
-
-Example: Running with **Claude 4 Sonnet** for a 15-step OSWorld evaluation:
-
+### 3️⃣ Running Evaluation
+Example: Evaluate **Claude 4 Sonnet** (15 steps):
 ```bash
 python run_multienv_e2e.py \
     --api_url <your_api_url> \
@@ -105,10 +83,46 @@ python run_multienv_e2e.py \
 
 ---
 
+## 📐 Key Metrics
+
+1. **Task Accuracy (Acc)** — % of tasks successfully completed.
+2. **Tool Invocation Rate (TIR)** — correct decisions to use a tool or not.
+3. **Average Completion Steps (ACS)** — average number of actions per completed task.
+
+---
+
+## 📊 Leaderboard (Sorted by Accuracy)
+
+🔗 **Live Leaderboard:** [os-world-mcp.github.io](https://os-world-mcp.github.io)
+
+**Max Steps: 15**
+
+| Model / Agent        | Acc | TIR | ACS |
+|----------------------|----------|-----------------------------|-----------------------------|
+| Agent-S2.5           | 42.1     | 30.0                        | 10.0                        |
+| Claude-4-Sonnet      | 35.3     | 30.0                        | 10.4                        |
+| Seed1.5-VL           | 32.0     | 25.1                        | 10.2                        |
+| Qwen3-VL             | 31.3     | 24.5                        | 10.5                        |
+| Gemini-2.5-Pro       | 20.5     | 16.8                        | 11.4                        |
+| OpenAI o3            | 20.4     | 16.7                        | 11.6                        |
+| Qwen2.5-VL           | 15.8     | 13.1                        | 13.5                        |
+
+**Max Steps: 50**
+
+| Model / Agent        | Acc | TIR   | ACS   |
+|----------------------|----------|-------|-------|
+| Agent-S2.5           | 49.5     | 35.3  | 17.0  |
+| Claude-4-Sonnet      | 43.3     | 36.6  | 20.1  |
+| Qwen3-VL             | 39.1     | 29.5  | 21.1  |
+| Seed1.5-VL           | 38.4     | 29.0  | 23.0  |
+| Gemini-2.5-Pro       | 27.2     | 21.5  | 29.7  |
+| OpenAI o3            | 25.2     | 21.0  | 32.1  |
+| Qwen2.5-VL           | 14.8     | 10.9  | 37.2  |
+
+---
+
 ## 📚 Citation
-
-If you use **OSWorld-MCP** in your research, please cite (TODO):
-
+*TODO*
 ```bibtex
 @article{jia2025osworldmcp,
   title={OSWorld-MCP: Benchmarking MCP Tool Invocation in Computer-Use Agents},
