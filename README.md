@@ -27,7 +27,7 @@ Designed as an extension of **OSWorld**, it significantly improves realism, bala
 
 **Architecture Overview**  
 
-![OSWorld-MCP Architecture](images/Fig2.png)  
+![OSWorld-MCP Architecture](images/architecture.png)  
 *Figure: OSWorld-MCP evaluation framework integrating GUI actions and MCP tool invocations.*
 
 ---
