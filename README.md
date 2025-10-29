@@ -1,9 +1,9 @@
 # OSWorld-MCP: Benchmarking MCP Tool Invocation in Computer-Use Agents
 
 ## 🔔 Updates
-**2025-10-23:** We released our paper and project page! 🎉 
-*TODO* 
-📄 [Read the Paper](https://arxiv.org/abs/xxxx.xxxxx) &nbsp;|&nbsp; 🌐 [Visit the Project Page](https://os-world-mcp.github.io)
+**2025-10-28:** We released our paper and project page! 🎉 
+
+📄 [Read the Paper](https://arxiv.org/abs/2510.24563) &nbsp;|&nbsp; 🌐 [Visit the Project Page](https://osworld-mcp.github.io)
 
 ---
 
@@ -122,12 +122,12 @@ python run_multienv_e2e.py \
 ---
 
 ## 📚 Citation
-*TODO*
+
 ```bibtex
 @article{jia2025osworldmcp,
   title={OSWorld-MCP: Benchmarking MCP Tool Invocation in Computer-Use Agents},
   author={Jia, Hongrui and Liao, Jitong and Zhang, Xi and Xu, Haiyang and Xie, Tianbao and Jiang, Chaoya and Yan, Ming and Liu, Si and Ye, Wei and Huang, Fei},
   year={2025},
-  journal={arXiv preprint arXiv:xxxx.xxxxx}
+  journal={arXiv preprint arXiv:2510.24563}
 }
 ```
