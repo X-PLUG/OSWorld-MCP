@@ -93,7 +93,7 @@ python run_multienv_e2e.py \
 
 ## 📊 Leaderboard (Sorted by Accuracy)
 
-🔗 **Live Leaderboard:** [os-world-mcp.github.io](https://os-world-mcp.github.io)
+🔗 **Live Leaderboard:** [osworld-mcp.github.io](https://osworld-mcp.github.io)
 
 **Max Steps: 15**
 
