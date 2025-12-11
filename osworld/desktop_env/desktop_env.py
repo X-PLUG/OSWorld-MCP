@@ -423,7 +423,11 @@ print(output);"""
             tool_name = cur_app.strip().lower().replace('-', '_')
             if tool_name in tool_list:
                 app_info = None
-                
+                class_name = tool_list[tool_name]
+                command = f"from {tool_name} import *; "
+                command += f"{class_name}.env_info(); "
+                command += f"{class_name}.print_result();"
+                app_info = self.controller.execute_python_command(command)['output'].strip()
             else:
                 app_info = None
         else:
