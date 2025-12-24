@@ -399,11 +399,11 @@ print(output);"""
             "libreoffice_calc": "CalcTools",
             "libreoffice_impress": "ImpressTools",
             "libreoffice_writer": "WriterTools",
-            "code": "CodeTools",
-            "vlc": "VLCTools",
-            "google_chrome": "BrowserTools",
-            "thunderbird": "ThunderbirdTools",
-            "os": "OSTools"
+            # "code": "CodeTools",
+            # "vlc": "VLCTools",
+            # "google_chrome": "BrowserTools",
+            # "thunderbird": "ThunderbirdTools",
+            # "os": "OSTools"
         }
         
         self.maximize_window()
