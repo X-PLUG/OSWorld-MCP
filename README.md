@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/x-plug-osworld-mcp-badge.png)](https://mseep.ai/app/x-plug-osworld-mcp)
+
 # OSWorld-MCP: Benchmarking MCP Tool Invocation in Computer-Use Agents
 
 ## 🔔 Updates
