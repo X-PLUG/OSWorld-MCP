@@ -572,6 +572,10 @@ class OwlAgent:
         use_seed = self.use_seed
         tool_name = obs['tool_name']
 
+        app_info = obs.get("exe_result", "None")
+
+        self.app_prompts.append(app_info)
+
         print('---------', self.model)
         model_name = self.model
 
@@ -756,11 +760,11 @@ class OwlAgent:
                     if use_dashscope:
                         messages[-1]['content'].append({"text": "Screenshot of step %d:\n"%(history_idx+1)})
                         messages[-1]['content'].append({"image": f"data:image/png;base64,{encoded_string}"})
-                        messages[-1]['content'].append({"text": f"{cur_app_prompt}"})
+                        messages[-1]['content'].append({"text": f"Action Response: {cur_app_prompt}"})
                     else:
                         messages[-1]['content'].append({"type": "text", "text": "Screenshot of step %d:\n"%(history_idx+1)})
                         messages[-1]['content'].append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{encoded_string}", "detail": "high",}})
-                        messages[-1]['content'].append({"text": "text", "text": f"{cur_app_prompt}"})
+                        messages[-1]['content'].append({"text": "text", "text": f"Action Response: {cur_app_prompt}"})
                     image_num += 1
 
             cur_image = images[image_num]
@@ -776,29 +780,7 @@ class OwlAgent:
             image_num += 1
         
         else:
-            # cur_app = obs["cur_app"]
-            # logger.info(f"current app is {cur_app}")
-
-            # if obs["apps"]:
-            #     app_str = "Window ID    App Name    Title\n"
-            #     for window_id, app in obs["apps"].items():
-            #         app_str += f"{window_id}    {app['app_name']}    {app['title']}\n"
-            # else:
-            #     app_str = "None"
-
-            # app_info = obs["app_info"].strip() if obs["app_info"] else "None"
-            # app_info = app_info[:5000] + "..." if len(app_info) > 5000 else app_info
-
-            # app_prompt = "* Apps: {}\n\n* Current App: {}\n\n* App Info: {}".format(
-            #     app_str.strip(),
-            #     obs["cur_window_id"].strip() if obs["cur_window_id"] in app_str else "None",
-            #     app_info,
-            # )
-            # if use_dashscope:
-            #     messages[-1]['content'].append({"text": app_prompt})
-            # else:
-            #     messages[-1]['content'].append({"type": "text", "text": app_prompt})
-            
+                    
             cur_image = images[image_num]
             encoded_string = pil_to_base64(cur_image)
             if use_dashscope:
@@ -928,26 +910,6 @@ class OwlAgent:
                 self.input_swap
             )
             actions.append(pyautogui_code)
-
-        cur_app = obs["cur_app"]
-        logger.info(f"current app is {cur_app}")
-        if obs["apps"]:
-            app_str = "Window ID    App Name    Title\n"
-            for window_id, app in obs["apps"].items():
-                app_str += f"{window_id}    {app['app_name']}    {app['title']}\n"
-        else:
-            app_str = "None"
-        app_info = None
-        for action in actions:
-            if "env_info" in action:
-                app_info = obs["app_info"].strip() if obs["app_info"] else "None"
-                app_info = app_info[:5000] + "..." if len(app_info) > 5000 else app_info
-        app_prompt = "* Apps: {}\n\n* Current App: {}\n\n* App Info: {}".format(
-            app_str.strip(),
-            obs["cur_window_id"].strip() if obs["cur_window_id"] in app_str else "None",
-            app_info,
-        )
-        self.app_prompts.append(app_prompt)
         
         self.actions.append(actions)
 
