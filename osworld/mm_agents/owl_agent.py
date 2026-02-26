@@ -764,7 +764,7 @@ class OwlAgent:
                     else:
                         messages[-1]['content'].append({"type": "text", "text": "Screenshot of step %d:\n"%(history_idx+1)})
                         messages[-1]['content'].append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{encoded_string}", "detail": "high",}})
-                        messages[-1]['content'].append({"text": "text", "text": f"Action Response: {cur_app_prompt}"})
+                        messages[-1]['content'].append({"type": "text", "text": f"Action Response: {cur_app_prompt}"})
                     image_num += 1
 
             cur_image = images[image_num]
