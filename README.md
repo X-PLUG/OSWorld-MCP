@@ -17,8 +17,8 @@ Designed as an extension of **OSWorld**, it significantly improves realism, bala
 - **158 validated MCP tools**, spanning **7 common applications** (LibreOffice Writer, Calc, Impress, VS Code, Google Chrome, VLC, OS utilities). Among them, **25 distractor tools** for robustness testing
 - **250 tool-beneficial tasks** → 69% of benchmark tasks benefit from MCP tools
 - Multi-round tool invocation possible, posing real decision-making challenges
-- **MCP tools boost model accuracy & efficiency** — e.g., OpenAI o3: 8.3% → 20.4% (15 steps)
-- Highest observed Tool Invocation Rate (**TIR**) = 36.3% (Claude-4-Sonnet, 50 steps) → indicating ample room for improvement
+- **MCP tools boost model accuracy & efficiency** — e.g., OpenAI o3: 8.3% → 17.6% (15 steps)
+- Highest observed Tool Invocation Rate (**TIR**) = 33.3% (Claude-4-Sonnet, 50 steps) → indicating ample room for improvement
 - MCP tools improve agent metrics
 - Higher tool invocation correlates with higher accuracy
 - Combining tools introduces significant challenges
@@ -100,24 +100,24 @@ python run_multienv_e2e.py \
 | Model / Agent        | Acc | TIR | ACS |
 |----------------------|----------|-----------------------------|-----------------------------|
 | Agent-S2.5           | 42.1     | 30.0                        | 10.0                        |
-| Claude-4-Sonnet      | 35.3     | 30.0                        | 10.4                        |
-| Seed1.5-VL           | 32.0     | 25.1                        | 10.2                        |
-| Qwen3-VL             | 31.3     | 24.5                        | 10.5                        |
-| Gemini-2.5-Pro       | 20.5     | 16.8                        | 11.4                        |
-| OpenAI o3            | 20.4     | 16.7                        | 11.6                        |
-| Qwen2.5-VL           | 15.8     | 13.1                        | 13.5                        |
+| Claude-4-Sonnet      | 36.1     | 27.4                        | 10.5                        |
+| Qwen3-VL             | 32.8     | 21.5                        | 10.0                        |
+| Seed1.5-VL           | 30.7     | 21.0                        | 10.1                        |
+| OpenAI o3            | 17.6     | 11.6                        | 11.9                        |
+| Gemini-2.5-Pro       | 17.4     | 12.2                        | 11.6                        |
+| Qwen2.5-VL           | 14.5     | 10.1                        | 14.0                        |
 
 **Max Steps: 50**
 
 | Model / Agent        | Acc | TIR   | ACS   |
 |----------------------|----------|-------|-------|
 | Agent-S2.5           | 49.5     | 35.3  | 17.0  |
-| Claude-4-Sonnet      | 43.3     | 36.6  | 20.1  |
-| Qwen3-VL             | 39.1     | 29.5  | 21.1  |
-| Seed1.5-VL           | 38.4     | 29.0  | 23.0  |
-| Gemini-2.5-Pro       | 27.2     | 21.5  | 29.7  |
-| OpenAI o3            | 25.2     | 21.0  | 32.1  |
-| Qwen2.5-VL           | 14.8     | 10.9  | 37.2  |
+| Claude-4-Sonnet      | 45.0     | 33.3  | 20.0  |
+| Qwen3-VL             | 39.5     | 26.1  | 18.6  |
+| Seed1.5-VL           | 38.2     | 25.1  | 22.3  |
+| Gemini-2.5-Pro       | 25.7     | 16.8  | 31.0 |
+| OpenAI o3            | 24.1     | 16.0  | 33.0  |
+| Qwen2.5-VL           | 15.6     | 9.3  | 39.0  |
 
 ---
 
