@@ -53,7 +53,7 @@ def process_image(image_bytes):
 
     return base64.b64encode(processed_bytes).decode("utf-8")
 
-class Qwen3VLAgent:
+class GUIOwl1_5Agent:
 
     def __init__(
         self,
@@ -444,7 +444,7 @@ Previous actions:
             self.model,
         )
 
-        logger.info(f"Qwen3VL Output: {response}")
+        logger.info(f"GUI-Owl 1.5 Output: {response}")
 
         low_level_instruction, pyautogui_code = self.parse_response(
             response,
@@ -469,7 +469,7 @@ Previous actions:
                 self.model,
             )
 
-            logger.info(f"Qwen3VL Output: {response}")
+            logger.info(f"GUI-Owl 1.5 Output: {response}")
 
 
             low_level_instruction, pyautogui_code = self.parse_response(
@@ -789,7 +789,7 @@ Previous actions:
         global logger
         logger = (
             _logger if _logger is not None
-            else logging.getLogger("desktopenv.qwen3vl_agent")
+            else logging.getLogger("desktopenv.guiowl1_5_agent")
         )
 
         self.thoughts = []
