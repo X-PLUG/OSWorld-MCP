@@ -12,7 +12,7 @@ from multiprocessing import Process, Manager
 from multiprocessing import current_process
 import lib_run_single
 from desktop_env.desktop_env import DesktopEnv
-from mm_agents.qwen3vl_agent import Qwen3VLAgent
+from mm_agents.gui_owl_1_5_agent import GUIOwl1_5Agent
 
 # Global variables for signal handling
 active_environments = []
@@ -27,7 +27,7 @@ if os.path.exists(".env"):
 
 def config() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Run end-to-end evaluation on the benchmark (Qwen3VL)"
+        description="Run end-to-end evaluation on the benchmark (GUI-Owl 1.5)"
     )
 
     # environment config
@@ -185,7 +185,7 @@ def run_env_tasks(task_queue, args: argparse.Namespace, shared_scores: list):
             in ["a11y_tree", "screenshot_a11y_tree", "som"],
         )
         active_environments.append(env)
-        agent = Qwen3VLAgent(
+        agent = GUIOwl1_5Agent(
             model=args.model,
             api_url=args.api_url,
             api_key=args.api_key,
