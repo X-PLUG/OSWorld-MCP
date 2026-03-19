@@ -789,7 +789,7 @@ Previous actions:
         global logger
         logger = (
             _logger if _logger is not None
-            else logging.getLogger("desktopenv.guiowl1_5_agent")
+            else logging.getLogger("desktopenv.gui_owl_1_5_agent")
         )
 
         self.thoughts = []
