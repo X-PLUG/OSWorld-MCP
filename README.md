@@ -1,6 +1,11 @@
 # OSWorld-MCP: Benchmarking MCP Tool Invocation in Computer-Use Agents
 
 ## 🔔 Updates
+
+**2026-05-09:** Fixed bugs in LibreOffice MCP tools. New model results added: Kimi-K2.5, Gemini-2.5-Pro, Claude-3.5-Sonnet, and Qwen2.5-Plus.
+
+**2026-01-26:** OSWorld-MCP is accepted to **ICLR 2026**! 🎉
+
 **2025-10-28:** We released our paper and project page! 🎉 
 
 📄 [Read the Paper](https://arxiv.org/abs/2510.24563) &nbsp;|&nbsp; 🌐 [Visit the Project Page](https://osworld-mcp.github.io)
