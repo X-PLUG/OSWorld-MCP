@@ -5,7 +5,7 @@ import uno
 from com.sun.star.awt.FontSlant import ITALIC, NONE, OBLIQUE
 from com.sun.star.awt.FontWeight import BOLD, NORMAL
 from com.sun.star.beans import PropertyValue
-from com.sun.star.style.ParagraphAdjust import CENTER, LEFT, RIGHT
+from com.sun.star.style.ParagraphAdjust import CENTER, LEFT, RIGHT, BLOCK as JUSTIFY
 from com.sun.star.text.ControlCharacter import PARAGRAPH_BREAK
 from com.sun.star.text.TextContentAnchorType import AS_CHARACTER
 from functools import wraps
@@ -82,7 +82,7 @@ class WriterTools:
     @with_context
     def write_text(cls, text, bold=False, italic=False, size=None):
         """写入文本"""
-        cls.cursor.CharWeight = 150 if bold else 100
+        cls.cursor.CharWeight = BOLD if bold else NORMAL
         cls.cursor.CharPosture = ITALIC if italic else NONE
         if size:
             cls.cursor.CharHeight = size
@@ -122,7 +122,7 @@ class WriterTools:
         cls.ret = para_str
         cls.print_result()
         return cls.ret
-
+    
     @classmethod
     @with_context
     def set_color(cls, pattern, color, paragraph_indices=None):
@@ -167,38 +167,56 @@ class WriterTools:
     @classmethod
     @with_context
     def find_and_replace(cls, pattern, replacement, paragraph_indices=None):
-        """
-        Finds all occurrences of a specified text pattern and replaces them with another text in the document.
-
-        Args:
-            pattern (str): The pattern to match in the document, should be a regular expression
-            replacement (str): The text to replace the found text with
-            paragraph_indices (list, optional): Indices of paragraphs to modify (0-based indexing)
-
-        Returns:
-            str: Success message with number of replacements made
-        """
         try:
-            enum = cls.doc.Text.createEnumeration()
-            paragraphs = []
+            text = cls.doc.getText()
+            enum = text.createEnumeration()
+
+            # 分离正文段落和表格
+            body_paragraphs = []
+            tables = []
             while enum.hasMoreElements():
-                paragraphs.append(enum.nextElement())
+                element = enum.nextElement()
+                if element.supportsService("com.sun.star.text.Paragraph"):
+                    body_paragraphs.append(element)
+                elif element.supportsService("com.sun.star.text.TextTable"):
+                    tables.append(element)
+
             total_replacements = 0
-            if not paragraph_indices:
-                paragraphs_to_process = list(range(len(paragraphs)))
-            else:
-                paragraphs_to_process = [i for i in paragraph_indices if 0 <= i < len(paragraphs)]
             regex = re.compile(pattern)
+
+            def replace_in_paragraph(paragraph):
+                """对单个段落执行替换，返回替换次数"""
+                if not paragraph.supportsService("com.sun.star.text.Paragraph"):
+                    return 0
+                text_content = paragraph.getString()
+                new_text, count = regex.subn(replacement, text_content)
+                if count > 0:
+                    paragraph.setString(new_text)
+                return count
+
+            # 处理正文段落
+            if not paragraph_indices:
+                paragraphs_to_process = list(range(len(body_paragraphs)))
+            else:
+                paragraphs_to_process = [
+                    i for i in paragraph_indices if 0 <= i < len(body_paragraphs)
+                ]
+
             for idx in paragraphs_to_process:
-                if idx >= len(paragraphs):
-                    continue
-                paragraph = paragraphs[idx]
-                if paragraph.supportsService("com.sun.star.text.Paragraph"):
-                    text_content = paragraph.getString()
-                    new_text, count = regex.subn(replacement, text_content)
-                    if count > 0:
-                        paragraph.setString(new_text)
-                        total_replacements += count
+                total_replacements += replace_in_paragraph(body_paragraphs[idx])
+
+            # 处理表格内所有段落
+            # 注意：表格内不受 paragraph_indices 控制，始终全量处理
+            for table in tables:
+                cell_names = table.getCellNames()
+                for cell_name in cell_names:
+                    cell = table.getCellByName(cell_name)
+                    cell_text = cell.getText()
+                    cell_enum = cell_text.createEnumeration()
+                    while cell_enum.hasMoreElements():
+                        cell_para = cell_enum.nextElement()
+                        total_replacements += replace_in_paragraph(cell_para)
+
             cls.ret = f"Successfully made {total_replacements} replacements"
             return cls.ret
         except Exception as e:
@@ -208,27 +226,61 @@ class WriterTools:
     @classmethod
     @with_context
     def set_font(cls, font_name, paragraph_indices=None):
-        """
-        Changes the font of text in the document or specified paragraphs.
-
-        Args:
-            font_name (str): The name of the font to apply (e.g., 'Times New Roman', 'Arial', 'Calibri')
-            paragraph_indices (list, optional): Indices of paragraphs to modify (0-based indexing).
-                                             If not provided, applies to all paragraphs.
-        """
         try:
             text = cls.doc.getText()
             enum = text.createEnumeration()
             paragraphs = []
             while enum.hasMoreElements():
                 paragraphs.append(enum.nextElement())
+
             if not paragraph_indices:
                 paragraph_indices = range(len(paragraphs))
+
             for idx in paragraph_indices:
                 if 0 <= idx < len(paragraphs):
                     paragraph = paragraphs[idx]
-                    cursor = text.createTextCursorByRange(paragraph)
-                    cursor.CharFontName = font_name
+
+                    # 处理正文段落
+                    if paragraph.supportsService("com.sun.star.text.Paragraph"):
+                        # 1. 先设段落级默认
+                        para_cursor = text.createTextCursorByRange(paragraph)
+                        para_cursor.setPropertyValue("CharFontName", font_name)
+                        para_cursor.setPropertyValue("CharFontNameAsian", font_name)
+                        para_cursor.setPropertyValue("CharFontNameComplex", font_name)
+
+                        # 2. 再逐 portion 覆盖字符级 override
+                        portion_enum = paragraph.createEnumeration()
+                        while portion_enum.hasMoreElements():
+                            portion = portion_enum.nextElement()
+                            portion_cursor = text.createTextCursorByRange(portion)
+                            portion_cursor.setPropertyValue("CharFontName", font_name)
+                            portion_cursor.setPropertyValue("CharFontNameAsian", font_name)
+                            portion_cursor.setPropertyValue("CharFontNameComplex", font_name)
+
+                    # 处理表格内段落
+                    elif paragraph.supportsService("com.sun.star.text.TextTable"):
+                        cell_names = paragraph.getCellNames()
+                        for cell_name in cell_names:
+                            cell = paragraph.getCellByName(cell_name)
+                            cell_text = cell.getText()
+                            cell_enum = cell_text.createEnumeration()
+                            while cell_enum.hasMoreElements():
+                                cell_para = cell_enum.nextElement()
+                                if cell_para.supportsService("com.sun.star.text.Paragraph"):
+                                    # 段落级
+                                    cell_para_cursor = cell_text.createTextCursorByRange(cell_para)
+                                    cell_para_cursor.setPropertyValue("CharFontName", font_name)
+                                    cell_para_cursor.setPropertyValue("CharFontNameAsian", font_name)
+                                    cell_para_cursor.setPropertyValue("CharFontNameComplex", font_name)
+                                    # portion 级
+                                    portion_enum = cell_para.createEnumeration()
+                                    while portion_enum.hasMoreElements():
+                                        portion = portion_enum.nextElement()
+                                        portion_cursor = cell_text.createTextCursorByRange(portion)
+                                        portion_cursor.setPropertyValue("CharFontName", font_name)
+                                        portion_cursor.setPropertyValue("CharFontNameAsian", font_name)
+                                        portion_cursor.setPropertyValue("CharFontNameComplex", font_name)
+
             cls.ret = "Success"
             return True
         except Exception as e:
@@ -238,14 +290,6 @@ class WriterTools:
     @classmethod
     @with_context
     def set_line_spacing(cls, spacing_value, paragraph_indices=None):
-        """
-        Sets the line spacing for specified paragraphs in the document.
-
-        Args:
-            spacing_value (float): The line spacing value to apply (1.0 for single spacing, 2.0 for double spacing, etc.)
-            paragraph_indices (list, optional): Indices of paragraphs to modify (0-based indexing).
-                                            If not provided, applies to all paragraphs.
-        """
         try:
             text = cls.doc.getText()
             paragraph_enum = text.createEnumeration()
@@ -255,20 +299,28 @@ class WriterTools:
             while paragraph_enum.hasMoreElements():
                 paragraph = paragraph_enum.nextElement()
 
+                # 只处理真正的段落（跳过 TextTable 等）
+                if not paragraph.supportsService("com.sun.star.text.Paragraph"):
+                    current_index += 1
+                    continue
+
                 if not paragraph_indices or current_index in paragraph_indices:
                     line_spacing = uno.createUnoStruct("com.sun.star.style.LineSpacing")
                     line_spacing.Mode = 0
                     line_spacing.Height = line_spacing_value
-                    paragraph.ParaLineSpacing = line_spacing
 
-                if paragraph.String.strip():
-                    current_index += 1
+                    # 通过 cursor 的 setPropertyValue 才能真正写入
+                    para_cursor = text.createTextCursorByRange(paragraph)
+                    para_cursor.setPropertyValue("ParaLineSpacing", line_spacing)
+
+                current_index += 1  # 对所有段落统一计数（已在之前修复）
 
             cls.ret = "Success"
             return True
         except Exception as e:
             cls.ret = f"Error: {str(e)}"
             return False
+
 
     @classmethod
     @with_context
@@ -496,16 +548,16 @@ class WriterTools:
                     current_index += 1
                     continue
                 if paragraph.supportsService("com.sun.star.text.Paragraph"):
-                    para_cursor = cls.text.createTextCursorByRange(paragraph)
                     para_text = paragraph.getString()
                     matches = list(regex.finditer(para_text))
-                    for match in reversed(matches):
+                    for match in matches:
                         start_pos = match.start()
                         end_pos = match.end()
-                        para_cursor.gotoStart(False)
-                        para_cursor.goRight(start_pos, False)
-                        para_cursor.goRight(end_pos - start_pos, True)
-                        para_cursor.CharHeight = font_size
+                        # 每次从段落起点重新创建 cursor，避免 gotoStart 跳到文档开头
+                        match_cursor = cls.text.createTextCursorByRange(paragraph.getStart())
+                        match_cursor.goRight(start_pos, False)
+                        match_cursor.goRight(end_pos - start_pos, True)
+                        match_cursor.CharHeight = font_size
                 current_index += 1
             cls.ret = f"Successfully changed font size to {font_size} for text matching '{pattern}'"
             return cls.ret
@@ -585,7 +637,7 @@ class WriterTools:
             str: Success message or error message
         """
         try:
-            alignment_map = {"left": LEFT, "center": CENTER, "right": RIGHT, "justify": 3}
+            alignment_map = {"left": LEFT, "center": CENTER, "right": RIGHT, "justify": JUSTIFY}
             if alignment.lower() not in alignment_map:
                 cls.ret = f"Error: Invalid alignment '{alignment}'. Use 'left', 'center', 'right', or 'justify'."
                 return cls.ret
@@ -656,50 +708,106 @@ class WriterTools:
     @classmethod
     @with_context
     def set_default_font(cls, font_name, font_size=None):
-        """
-        Sets the default font for new text in the document without changing existing text.
-
-        Args:
-            font_name (str): The name of the font to set as default (e.g., 'Times New Roman', 'Arial', 'Calibri')
-            font_size (float, optional): The default font size in points.
-
-        Returns:
-            str: Success message or error message
-        """
         try:
-            style_families = cls.doc.getStyleFamilies()
-            paragraph_styles = style_families.getByName("ParagraphStyles")
-            default_style_names = ["Default", "Standard", "Normal"]
-            standard_style = None
-            for style_name in default_style_names:
-                if paragraph_styles.hasByName(style_name):
-                    standard_style = paragraph_styles.getByName(style_name)
-                    break
-            if standard_style is None:
-                style_names = paragraph_styles.getElementNames()
-                if style_names:
-                    standard_style = paragraph_styles.getByName(style_names[0])
-                else:
-                    raise Exception("Could not find default paragraph style")
-            standard_style.setPropertyValue("CharFontName", font_name)
-            standard_style.setPropertyValue("CharFontNameAsian", font_name)
-            standard_style.setPropertyValue("CharFontNameComplex", font_name)
-            if font_size is not None:
-                standard_style.setPropertyValue("CharHeight", float(font_size))
-                standard_style.setPropertyValue("CharHeightAsian", float(font_size))
-                standard_style.setPropertyValue("CharHeightComplex", float(font_size))
-            cls.cursor.setPropertyValue("CharFontName", font_name)
-            cls.cursor.setPropertyValue("CharFontNameAsian", font_name)
-            cls.cursor.setPropertyValue("CharFontNameComplex", font_name)
-            if font_size is not None:
-                cls.cursor.setPropertyValue("CharHeight", float(font_size))
-                cls.cursor.setPropertyValue("CharHeightAsian", float(font_size))
-                cls.cursor.setPropertyValue("CharHeightComplex", float(font_size))
-            cls.ret = f"Default font set to '{font_name}'" + (f" with size {font_size}pt" if font_size else "")
+            # ── 1. 写入系统级用户配置（registrymodifications.xcu）──────────────
+            config_provider = cls.ctx.ServiceManager.createInstanceWithContext(
+                "com.sun.star.configuration.ConfigurationProvider", cls.ctx
+            )
+
+            # Writer 默认字体节点
+            node_prop = PropertyValue()
+            node_prop.Name = "nodepath"
+            node_prop.Value = "/org.openoffice.Office.Writer/DefaultFont"
+
+            try:
+                config_access = config_provider.createInstanceWithArguments(
+                    "com.sun.star.configuration.ConfigurationUpdateAccess",
+                    (node_prop,)
+                )
+                # Western（拉丁）字体
+                config_access.setPropertyValue("Standard", font_name)
+                config_access.setPropertyValue("Heading", font_name)
+                config_access.setPropertyValue("List", font_name)
+                config_access.setPropertyValue("Caption", font_name)
+                config_access.setPropertyValue("Index", font_name)
+                if font_size is not None:
+                    config_access.setPropertyValue("StandardHeight", int(font_size * 100))
+
+                # CJK 字体节点
+                node_prop_cjk = PropertyValue()
+                node_prop_cjk.Name = "nodepath"
+                node_prop_cjk.Value = "/org.openoffice.Office.Writer/DefaultFont"
+                # Asian / Complex 通常在同一节点下有 Asian* 属性
+                try:
+                    config_access.setPropertyValue("StandardAsian", font_name)
+                    config_access.setPropertyValue("HeadingAsian", font_name)
+                    config_access.setPropertyValue("ListAsian", font_name)
+                    config_access.setPropertyValue("CaptionAsian", font_name)
+                    config_access.setPropertyValue("IndexAsian", font_name)
+                    config_access.setPropertyValue("StandardComplex", font_name)
+                    config_access.setPropertyValue("HeadingComplex", font_name)
+                    config_access.setPropertyValue("ListComplex", font_name)
+                    config_access.setPropertyValue("CaptionComplex", font_name)
+                    config_access.setPropertyValue("IndexComplex", font_name)
+                    if font_size is not None:
+                        config_access.setPropertyValue("StandardHeightAsian", int(font_size * 100))
+                        config_access.setPropertyValue("StandardHeightComplex", int(font_size * 100))
+                except Exception:
+                    pass  # 部分属性名可能不存在，忽略
+
+                config_access.commitChanges()  # 写入 registrymodifications.xcu
+            except Exception as e:
+                # 系统级配置写入失败时记录但继续执行文档级修改
+                cls.ret = f"Warning: Could not write system config: {str(e)}"
+
+            # ── 2. 同时修改当前文档的段落样式（文档级）────────────────────────
+            try:
+                style_families = cls.doc.getStyleFamilies()
+                paragraph_styles = style_families.getByName("ParagraphStyles")
+                default_style_names = ["Default", "Standard", "Normal"]
+                standard_style = None
+                for style_name in default_style_names:
+                    if paragraph_styles.hasByName(style_name):
+                        standard_style = paragraph_styles.getByName(style_name)
+                        break
+                if standard_style is None:
+                    style_names = paragraph_styles.getElementNames()
+                    if style_names:
+                        standard_style = paragraph_styles.getByName(style_names[0])
+
+                if standard_style is not None:
+                    standard_style.setPropertyValue("CharFontName", font_name)
+                    standard_style.setPropertyValue("CharFontNameAsian", font_name)
+                    standard_style.setPropertyValue("CharFontNameComplex", font_name)
+                    if font_size is not None:
+                        standard_style.setPropertyValue("CharHeight", float(font_size))
+                        standard_style.setPropertyValue("CharHeightAsian", float(font_size))
+                        standard_style.setPropertyValue("CharHeightComplex", float(font_size))
+            except Exception as e:
+                cls.ret = f"Warning: Could not update document style: {str(e)}"
+
+            # ── 3. 更新当前 cursor 默认属性────────────────────────────────────
+            try:
+                cls.cursor.setPropertyValue("CharFontName", font_name)
+                cls.cursor.setPropertyValue("CharFontNameAsian", font_name)
+                cls.cursor.setPropertyValue("CharFontNameComplex", font_name)
+                if font_size is not None:
+                    cls.cursor.setPropertyValue("CharHeight", float(font_size))
+                    cls.cursor.setPropertyValue("CharHeightAsian", float(font_size))
+                    cls.cursor.setPropertyValue("CharHeightComplex", float(font_size))
+            except Exception as e:
+                cls.ret = f"Warning: Could not update cursor properties: {str(e)}"
+
+            cls.ret = (
+                f"Default font set to '{font_name}'"
+                + (f" with size {font_size}pt" if font_size else "")
+            )
             return cls.ret
         except Exception as e:
             cls.ret = f"Error setting default font: {str(e)}"
             return cls.ret
+
+
 
     @classmethod
     @with_context

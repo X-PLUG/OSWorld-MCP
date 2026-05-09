@@ -3,12 +3,26 @@ from pathlib import Path
 import re
 import json
 import os
+import time
 
 import uno
 from com.sun.star.awt.FontSlant import ITALIC, NONE
 from com.sun.star.awt.FontWeight import BOLD, NORMAL
 from com.sun.star.beans import PropertyValue
-from com.sun.star.drawing.TextHorizontalAdjust import CENTER, LEFT, RIGHT
+# from com.sun.star.drawing.TextHorizontalAdjust import CENTER, LEFT, RIGHT
+# from com.sun.star.style.ParagraphAdjust import LEFT, CENTER, RIGHT, BLOCK as JUSTIFY
+from com.sun.star.style.ParagraphAdjust import (
+    LEFT as PARA_LEFT,
+    CENTER as PARA_CENTER,
+    RIGHT as PARA_RIGHT,
+    BLOCK as PARA_JUSTIFY,
+)
+from com.sun.star.drawing.TextHorizontalAdjust import (
+    LEFT as TEXT_LEFT,
+    CENTER as TEXT_CENTER,
+    RIGHT as TEXT_RIGHT,
+)
+from com.sun.star.awt.FontStrikeout import NONE as STRIKEOUT_NONE, SINGLE as STRIKEOUT_SINGLE
 from functools import wraps
 
 
@@ -93,10 +107,11 @@ class ImpressTools:
             pages = cls.doc.getDrawPages()
             content_str = ""
             if page_indices is None:
-                page_indices = range(pages.getCount())
+                page_indices = range(1, pages.getCount() + 1)
             for page_index in page_indices:
-                if 0 <= page_index < pages.getCount():
-                    page = pages.getByIndex(page_index)
+                zero_based = page_index - 1
+                if 0 <= zero_based < pages.getCount():
+                    page = pages.getByIndex(zero_based)
                     page_content = []
                     for i in range(page.getCount()):
                         shape = page.getByIndex(i)
@@ -107,7 +122,7 @@ class ImpressTools:
                                     "- Box " + str(i) + ": " + text.getString().strip())
 
                     c = "\n".join(page_content)
-                    content_str += f"Slide {page_index+1}:\n{c}\n\n"
+                    content_str += f"Slide {page_index}:\n{c}\n\n"
 
             cur_idx = cls.get_current_slide_index() + 1
             content_str = content_str + f"Current Slide Index: {cur_idx}"
@@ -201,47 +216,41 @@ class ImpressTools:
             if slide_index < 1 or slide_index > count_before:
                 cls.ret = f"Error: Invalid slide index {slide_index}. Valid range is 1-{count_before}"
                 return False
-            if target_position < 0 or target_position > count_before:
-                cls.ret = f"Error: Invalid target position {target_position}. Valid range is 0-{count_before}"
+            if target_position < 1 or target_position > count_before:
+                cls.ret = f"Error: Invalid target position {target_position}. Valid range is 1-{count_before}"
                 return False
 
             zero_based_index = slide_index - 1
             controller = cls.doc.getCurrentController()
             controller.setCurrentPage(draw_pages.getByIndex(zero_based_index))
+
             dispatcher = cls.ctx.ServiceManager.createInstanceWithContext(
-                "com.sun.star.frame.DispatchHelper", cls.ctx
-            )
+                "com.sun.star.frame.DispatchHelper", cls.ctx)
             frame = controller.getFrame()
 
-            # 执行复制
+            # 执行复制，新 slide 总是紧跟在源 slide 后面
             dispatcher.executeDispatch(frame, ".uno:DuplicatePage", "", 0, ())
+            time.sleep(0.3)
+
             draw_pages = cls.doc.getDrawPages()
-
-            # 新 slide 初始索引（复制总是在原 slide 后面生成）
             new_index = zero_based_index + 1
+            desired_index = target_position  # 1-based target 转 0-based 正好是 target_position
 
-            # 计算复制后目标位置（因为复制可能影响目标位置索引）
-            if slide_index <= target_position:
-                # target_position 在复制 slide 之后，所以它的索引需要 +1
-                target_position_after_copy = target_position + 1
-            else:
-                # target_position 在复制 slide 之前，索引不变
-                target_position_after_copy = target_position
+            # print(f"[DEBUG] new_index={new_index}, desired_index={desired_index}")
 
-            # 我们要把新 slide 移动到 target_position_after_copy 位置（0-based）
-            desired_index = target_position_after_copy  # 因为是“插到它后面”
-            controller.setCurrentPage(draw_pages.getByIndex(new_index))
+            # 每步移动前都 setCurrentPage 确保作用在正确的 slide 上
+            current = new_index
+            while current < desired_index:
+                controller.setCurrentPage(draw_pages.getByIndex(current))
+                dispatcher.executeDispatch(frame, ".uno:MovePageDown", "", 0, ())
+                time.sleep(0.1)
+                current += 1
 
-            if new_index < desired_index:
-                # 向下移动
-                for _ in range(desired_index - new_index):
-                    dispatcher.executeDispatch(
-                        frame, ".uno:MovePageDown", "", 0, ())
-            elif new_index > desired_index:
-                # 向上移动
-                for _ in range(new_index - desired_index):
-                    dispatcher.executeDispatch(
-                        frame, ".uno:MovePageUp", "", 0, ())
+            while current > desired_index:
+                controller.setCurrentPage(draw_pages.getByIndex(current))
+                dispatcher.executeDispatch(frame, ".uno:MovePageUp", "", 0, ())
+                time.sleep(0.1)
+                current -= 1
 
             cls.ret = f"Slide {slide_index} duplicated successfully and inserted after slide {target_position}"
             return True
@@ -249,6 +258,7 @@ class ImpressTools:
         except Exception as e:
             cls.ret = f"Error: {str(e)}"
             return False
+
 
     @classmethod
     @with_context
@@ -287,19 +297,8 @@ class ImpressTools:
 
     @classmethod
     @with_context
-    def write_text(cls, content, page_index, box_index, bold=False, italic=False, size=None, append=False):
-        """
-        Writes text to a specific textbox on a slide
-
-        :param content: The text content to add
-        :param page_index: The index of the slide (1-based indexing)
-        :param box_index: The index of the textbox to modify (0-based indexing)
-        :param bold: Whether to make the text bold, default is False
-        :param italic: Whether to make the text italic, default is False
-        :param size: The size of the text. If None, uses the box's current font size.
-        :param append: Whether to append the text, default is False. If you want to observe some formats(like a bullet at the beginning) or keep the original text, you should set up it.
-        :return: True if successful, False otherwise
-        """
+    def write_text(cls, content, page_index, box_index,
+                bold=None, italic=None, size=None, append=False):
         try:
             zero_based_page_index = page_index - 1
             pages = cls.doc.getDrawPages()
@@ -311,25 +310,37 @@ class ImpressTools:
                 cls.ret = f"Error: Box index {box_index} is out of range"
                 return False
             shape = page.getByIndex(box_index)
-            if not hasattr(shape, "String"):
+            if not hasattr(shape, "getText"):
                 cls.ret = f"Error: The shape at index {box_index} cannot contain text"
                 return False
-            if append:
-                shape.String = shape.String + content
+
+            text = shape.getText()
+            cursor = text.createTextCursor()
+
+            # libreoffice_impress.py write_text
+            if not append:
+                text = shape.getText()
+                cursor = text.createTextCursor()
+                cursor.gotoStart(False)
+                cursor.gotoEnd(True)
+                # 如果 shape 为空，gotoEnd 后 cursor 仍在起点，insertString replace 无害
+                # 如果不为空，replace=True 会替换选中内容
+                text.insertString(cursor, content, True)
             else:
-                shape.String = content
-            if hasattr(shape, "getCharacterProperties"):
-                char_props = shape.getCharacterProperties()
-                if bold:
-                    char_props.CharWeight = BOLD
-                else:
-                    char_props.CharWeight = NORMAL
-                if italic:
-                    char_props.CharPosture = ITALIC
-                else:
-                    char_props.CharPosture = NONE
-                if size is not None:
-                    char_props.CharHeight = size
+                cursor = text.createTextCursor()
+                cursor.gotoEnd(False)
+                text.insertString(cursor, content, False)
+
+            # 只在显式传入时才修改格式
+            cursor2 = text.createTextCursor()
+            cursor2.gotoStart(False)
+            cursor2.gotoEnd(True)
+            if bold is not None:
+                cursor2.setPropertyValue("CharWeight", BOLD if bold else NORMAL)
+            if italic is not None:
+                cursor2.setPropertyValue("CharPosture", ITALIC if italic else NONE)
+            if size is not None:
+                cursor2.setPropertyValue("CharHeight", float(size))
 
             cls.ret = f"Text successfully written to page {page_index}, box {box_index}"
             return True
@@ -775,22 +786,18 @@ class ImpressTools:
                 slides_to_modify = [pages.getByIndex(
                     i) for i in range(page_count)]
             for slide in slides_to_modify:
-                fill_props = cls.ctx.ServiceManager.createInstanceWithContext(
-                    "com.sun.star.drawing.FillProperties", cls.ctx
-                )
                 if image_path and os.path.exists(image_path):
                     abs_path = os.path.abspath(image_path)
                     file_url = uno.systemPathToFileUrl(abs_path)
-                    fill_props.FillStyle = uno.Enum(
+                    slide.FillStyle = uno.Enum(
                         "com.sun.star.drawing.FillStyle", "BITMAP")
-                    fill_props.FillBitmapURL = file_url
-                    fill_props.FillBitmapMode = uno.Enum(
+                    slide.FillBitmapURL = file_url
+                    slide.FillBitmapMode = uno.Enum(
                         "com.sun.star.drawing.BitmapMode", "STRETCH")
                 elif rgb_color is not None:
-                    fill_props.FillStyle = uno.Enum(
+                    slide.FillStyle = uno.Enum(
                         "com.sun.star.drawing.FillStyle", "SOLID")
-                    fill_props.FillColor = rgb_color
-                slide.setPropertyValue("Background", fill_props)
+                    slide.FillColor = rgb_color
             cls.ret = "Background set successfully"
             return True
         except Exception as e:
@@ -988,7 +995,10 @@ class ImpressTools:
                     cursor.gotoStart(False)
                     cursor.goRight(start_pos, False)
                     cursor.goRight(len(lines[line_number - 1]), True)
-                    cursor.CharStrikeout = apply
+                    cursor.setPropertyValue(
+                        "CharStrikeout",
+                        STRIKEOUT_SINGLE if apply else STRIKEOUT_NONE
+                    )
             cls.ret = f"Strike-through {'applied' if apply else 'removed'} successfully"
             return True
         except Exception as e:
@@ -1020,21 +1030,22 @@ class ImpressTools:
             if not hasattr(shape, "getText"):
                 cls.ret = "Error: Selected shape does not support text"
                 return False
-            if alignment == "left":
-                shape.TextHorizontalAdjust = LEFT
-            elif alignment == "center":
-                shape.TextHorizontalAdjust = CENTER
-            elif alignment == "right":
-                shape.TextHorizontalAdjust = RIGHT
-            elif alignment == "justify":
-                text = shape.getText()
-                cursor = text.createTextCursor()
-                cursor.gotoStart(False)
-                cursor.gotoEnd(True)
-                cursor.ParaAdjust = 3
-            else:
+            alignment_map = {
+                "left": PARA_LEFT,
+                "center": PARA_CENTER,
+                "right": PARA_RIGHT,
+                "justify": PARA_JUSTIFY,
+            }
+            if alignment not in alignment_map:
                 cls.ret = f"Error: Invalid alignment value: {alignment}"
                 return False
+
+            text = shape.getText()
+            cursor = text.createTextCursor()
+            cursor.gotoStart(False)
+            cursor.gotoEnd(True)
+            cursor.setPropertyValue("ParaAdjust", alignment_map[alignment])
+
             cls.ret = f"Successfully set text alignment to {alignment} for textbox {box_index} on slide {slide_index}"
             return True
         except Exception as e:
@@ -1145,11 +1156,11 @@ class ImpressTools:
                         page_number_shape.Position = uno.createUnoStruct(
                             "com.sun.star.awt.Point", new_x, new_y)
                         if position.endswith("left"):
-                            page_number_shape.ParaAdjust = LEFT
+                            page_number_shape.ParaAdjust = PARA_LEFT
                         elif position.endswith("center"):
-                            page_number_shape.ParaAdjust = CENTER
+                            page_number_shape.ParaAdjust = PARA_CENTER
                         elif position.endswith("right"):
-                            page_number_shape.ParaAdjust = RIGHT
+                            page_number_shape.ParaAdjust = PARA_RIGHT
                     if visible is not None:
                         try:
                             page_number_shape.Visible = visible
@@ -1182,13 +1193,13 @@ class ImpressTools:
                             pos_y = 100
                         if position.endswith("left"):
                             pos_x = 100
-                            page_number_shape.ParaAdjust = LEFT
+                            page_number_shape.ParaAdjust = PARA_LEFT
                         elif position.endswith("center"):
                             pos_x = (page_width - default_width) / 2
-                            page_number_shape.ParaAdjust = CENTER
+                            page_number_shape.ParaAdjust = PARA_CENTER
                         elif position.endswith("right"):
                             pos_x = page_width - default_width - 100
-                            page_number_shape.ParaAdjust = RIGHT
+                            page_number_shape.ParaAdjust = PARA_RIGHT
                     page_number_shape.Position = uno.createUnoStruct(
                         "com.sun.star.awt.Point", pos_x, pos_y)
                     text = page_number_shape.getText()
@@ -1316,13 +1327,13 @@ class ImpressTools:
                 text.insertTextContent(cursor, page_number, False)
                 if "center" in pos:
                     slide_number_shape.setPropertyValue(
-                        "TextHorizontalAdjust", CENTER)
+                        "TextHorizontalAdjust", TEXT_CENTER)
                 elif "right" in pos:
                     slide_number_shape.setPropertyValue(
-                        "TextHorizontalAdjust", RIGHT)
+                        "TextHorizontalAdjust", TEXT_RIGHT)
                 elif "left" in pos:
                     slide_number_shape.setPropertyValue(
-                        "TextHorizontalAdjust", LEFT)
+                        "TextHorizontalAdjust", TEXT_LEFT)
                 if font_size is not None:
                     cursor.gotoStart(False)
                     cursor.gotoEnd(True)

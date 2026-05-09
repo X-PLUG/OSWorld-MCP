@@ -46,7 +46,7 @@
     "type": "function",
     "function": {
       "name": "WriterTools.set_color",
-      "description": "Changes the color of matched text in the document for specified paragraphs.",
+      "description": "Changes the color of matched text in the document for specified paragraphs. NOTE: If the task only requires coloring text within a specific region (e.g., only inside a table, or only in the body), you MUST specify paragraph_indices to limit the scope. If paragraph_indices is not provided, the color change applies to ALL paragraphs in the document, which may produce unintended results.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -60,7 +60,10 @@
           },
           "paragraph_indices": {
             "type": "array",
-            "description": "Optional. Indices of paragraphs to modify (0-based indexing). If not provided, applies to all paragraphs."
+            "description": "Optional. Indices of paragraphs to modify (0-based indexing). If not provided, applies to all paragraphs. Use env_info() first to identify the correct paragraph indices for your target region (e.g., table rows, specific sections), then pass those indices here to avoid unintentionally modifying content outside the target region.",
+            "items": {
+              "type": "integer"
+            }
           }
         },
         "required": [

@@ -587,7 +587,7 @@
           },
           "target_position": {
             "type": "integer",
-            "description": "The position (1-based index) after which the duplicated slide will be placed"
+            "description": "The position (1-based index) after which the duplicated slide will be placed."
           }
         },
         "required": [
@@ -609,7 +609,7 @@
             "type": "array",
             "items": {
               "type": "integer",
-              "description": "Page index (starting from 0 or 1 depending on context)."
+              "description": "Page index (1-based indexing, consistent with all other tools)."
             },
             "description": "List of page indices to retrieve. If null or omitted, all pages are returned."
           }

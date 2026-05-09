@@ -346,6 +346,12 @@ class CalcTools:
             # 切换到目标工作表
             cls.doc.getCurrentController().setActiveSheet(sheet)
 
+            # 验证切换是否生效
+            active = cls.doc.getCurrentController().ActiveSheet
+            if active.getName() != sheet_name:
+                cls.ret = f"Error: Failed to switch to sheet '{sheet_name}', current active sheet is still '{active.getName()}'"
+                return False
+
             # 更新当前工作表引用
             cls.sheet = sheet
             cls.ret = "Success"
@@ -494,7 +500,7 @@ class CalcTools:
 
     @classmethod
     @with_context
-    def sort_column(cls, column_name, ascending=True, start_index=2):
+    def sort_column(cls, column_name, ascending=True, start_index=1):
         """
         Sorts the data in the specified column in ascending or descending order
 
@@ -601,25 +607,35 @@ class CalcTools:
             bool: True if successful, False otherwise
         """
         try:
-            # 获取新的列索引
-            new_indices = [cls._get_column_index(col) for col in column_order]
+            # 获取原始列索引列表
+            old_indices = [cls._get_column_index(col) for col in column_order]
 
-            # 创建新的列顺序
-            for new_index, old_index in enumerate(new_indices):
-                if new_index != old_index:
-                    cls.sheet.Columns.insertByIndex(new_index, 1)
-                    source = cls.sheet.Columns[old_index +
-                                               (old_index > new_index)]
-                    target = cls.sheet.Columns[new_index]
-                    target.setDataArray(source.getDataArray())
-                    cls.sheet.Columns.removeByIndex(
-                        old_index + (old_index > new_index), 1)
+            # 一次性读取所有需要重排列的数据
+            last_row = cls._get_last_used_row()
+            columns_data = []
+            for old_idx in old_indices:
+                col_range = cls.sheet.getCellRangeByPosition(
+                    old_idx, 0, old_idx, last_row)
+                columns_data.append(col_range.getDataArray())
+
+            # 确定实际要操作的列范围（取 old_indices 的最小到最大）
+            min_col = min(old_indices)
+            max_col = max(len(old_indices) - 1, max(old_indices))
+
+            # 按目标顺序将数据回写到对应位置
+            for new_idx, col_data in enumerate(columns_data):
+                target_col_idx = min_col + new_idx
+                col_range = cls.sheet.getCellRangeByPosition(
+                    target_col_idx, 0, target_col_idx, last_row)
+                col_range.setDataArray(col_data)
+
             cls.ret = "Success"
             return True
 
         except Exception as e:
             cls.ret = f"Error: {e}"
             return False
+
 
     @classmethod
     @with_context
@@ -682,12 +698,17 @@ class CalcTools:
                     "com.sun.star.sheet.DataPilotFieldOrientation", "DATA")
 
                 # 设置聚合函数
-                function_map = {"Count": "COUNT", "Sum": "SUM",
-                                "Average": "AVERAGE", "Min": "MIN", "Max": "MAX"}
-
-                if aggregation_function in function_map:
+                function_map = {
+                    "count": "COUNT",
+                    "sum": "SUM",
+                    "average": "AVERAGE",
+                    "min": "MIN",
+                    "max": "MAX"
+                }
+                if aggregation_function.lower() in function_map:
                     dimension.Function = uno.Enum(
-                        "com.sun.star.sheet.GeneralFunction", function_map[aggregation_function]
+                        "com.sun.star.sheet.GeneralFunction",
+                        function_map[aggregation_function.lower()]
                     )
 
             # 在当前工作表中创建数据透视表
@@ -738,45 +759,51 @@ class CalcTools:
     @classmethod
     @with_context
     def set_cell_value(cls, cell, value):
-        """
-        Set a value to a specific cell in the active worksheet.
-
-        Args:
-            cell (str): Cell reference (e.g., 'A1')
-            value (str): Value to set in the cell
-
-        Returns:
-            bool: True if successful, False otherwise
-        """
         try:
-            # 获取单元格对象
-            cell_obj = cls.sheet.getCellRangeByName(cell)
+            range_obj = cls.sheet.getCellRangeByName(cell)
+            addr = range_obj.getRangeAddress()
+            cell_obj = cls.sheet.getCellByPosition(
+                addr.StartColumn, addr.StartRow
+            )
+            # print(f"[DEBUG] cell_obj type: {type(cell_obj)}")  # 临时调试
 
             if isinstance(value, str) and value.startswith("="):
-                # 设置公式
-                cell_obj.Formula = value
+                # LibreOffice setFormula 要求分号作为参数分隔符
+                # 但引号内的逗号不能替换（如 "Alice,Bob" 里的逗号）
+                # 用状态机处理：只替换引号外的逗号
+                formula = value
+                result = []
+                in_quotes = False
+                for ch in formula:
+                    if ch == '"':
+                        in_quotes = not in_quotes
+                    if ch == ',' and not in_quotes:
+                        result.append(';')
+                    else:
+                        result.append(ch)
+                formula_converted = ''.join(result)
+                # print(f"[DEBUG] converted formula: {formula_converted}")
+                cell_obj.setFormula(formula_converted)
                 cls.ret = "Success"
                 return True
 
-            # 尝试将值转换为数字
             try:
-                # 尝试转换为整数
                 int_value = int(value)
-                cell_obj.Value = int_value
-            except ValueError:
+                cell_obj.setValue(int_value)
+            except (ValueError, TypeError):
                 try:
-                    # 尝试转换为浮点数
                     float_value = float(value)
-                    cell_obj.Value = float_value
-                except ValueError:
-                    # 如果不是数字，则设置为字符串
-                    cell_obj.String = value
+                    cell_obj.setValue(float_value)
+                except (ValueError, TypeError):
+                    cell_obj.setString(str(value))
 
             cls.ret = "Success"
             return True
         except Exception as e:
             cls.ret = f"Error: {e}"
             return False
+
+
 
     @classmethod
     @with_context
@@ -832,74 +859,71 @@ class CalcTools:
         except Exception as e:
             cls.ret = f"Error: {e}"
             return False
-
     @classmethod
     @with_context
     def create_chart(cls, chart_type, data_range, title=None, x_axis_title=None, y_axis_title=None):
-        """
-        Create a chart in the active worksheet based on the specified data range.
-
-        Args:
-            chart_type (str): Type of chart to create (bar, column, line, pie, scatter, area)
-            data_range (str): Range containing the data for the chart, in the format of 'A1:B10'
-            title (str, optional): Title for the chart
-            x_axis_title (str, optional): Title for the X axis
-            y_axis_title (str, optional): Title for the Y axis
-
-        Returns:
-            bool: True if successful, False otherwise
-        """
-        # 将图表类型映射到LibreOffice的图表类型常量
         try:
             chart_type_map = {
                 "bar": "com.sun.star.chart.BarDiagram",
-                "column": "com.sun.star.chart.ColumnDiagram",
+                "column": "com.sun.star.chart.BarDiagram",
                 "line": "com.sun.star.chart.LineDiagram",
                 "pie": "com.sun.star.chart.PieDiagram",
                 "scatter": "com.sun.star.chart.ScatterDiagram",
                 "area": "com.sun.star.chart.AreaDiagram",
             }
 
-            # 获取数据范围
-            cell_range_address = cls.sheet.getCellRangeByName(
-                data_range).getRangeAddress()
+            range_addresses = []
+            for segment in data_range.split(","):
+                segment = segment.strip()
+                if "." in segment:
+                    dot_idx = segment.index(".")
+                    seg_sheet_name = segment[:dot_idx]
+                    seg_range = segment[dot_idx + 1:]
+                    # 去掉可能的 $ 符号
+                    seg_range = seg_range.replace("$", "")
+                    seg_sheet = cls.doc.getSheets().getByName(seg_sheet_name)
+                    addr = seg_sheet.getCellRangeByName(seg_range).getRangeAddress()
+                    range_addresses.append(addr)
+                else:
+                    addr = cls.sheet.getCellRangeByName(segment).getRangeAddress()
+                    range_addresses.append(addr)
 
-            # 创建图表
             charts = cls.sheet.getCharts()
             rect = uno.createUnoStruct("com.sun.star.awt.Rectangle")
-            rect.Width = 10000  # 默认宽度
-            rect.Height = 7000  # 默认高度
+            rect.X = 0
+            rect.Y = 0
+            rect.Width = 10000
+            rect.Height = 7000
 
-            # 添加图表到工作表
+            import time
+            chart_name = f"Chart_{int(time.time())}"
             charts.addNewByName(
-                "MyChart", rect, (cell_range_address,), False, False)
+                chart_name, rect, tuple(range_addresses), True, True
+            )
+            time.sleep(0.3)
 
-            # 获取图表
-            chart = charts.getByName("MyChart")
+            chart = charts.getByName(chart_name)
             chart_doc = chart.getEmbeddedObject()
 
-            # 设置图表类型
-            diagram = chart_doc.createInstance(chart_type_map[chart_type])
-            chart_doc.setDiagram(diagram)
+            if chart_type in chart_type_map:
+                diagram = chart_doc.createInstance(chart_type_map[chart_type])
+                # column 需要设置 Vertical=False
+                if chart_type == "column":
+                    diagram.Vertical = False
+                elif chart_type == "bar":
+                    diagram.Vertical = True
+                chart_doc.setDiagram(diagram)
 
-            # 设置图表标题
             if title:
+                chart_doc.HasMainTitle = True
                 chart_doc.Title.String = title
-
-            # 设置X轴标题
-            if x_axis_title:
-                chart_doc.Diagram.XAxis.AxisTitle.String = x_axis_title
-
-            # 设置Y轴标题
-            if y_axis_title:
-                chart_doc.Diagram.YAxis.AxisTitle.String = y_axis_title
 
             cls.ret = "Success"
             return True
-
         except Exception as e:
             cls.ret = f"Error: {e}"
             return False
+
 
     @classmethod
     @with_context

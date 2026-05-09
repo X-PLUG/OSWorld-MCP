@@ -289,7 +289,7 @@
                     },
                     "value": {
                         "type": "string",
-                        "description": "Value to set in the cell"
+                        "description": "Value to set. For formulas, start with '=' and use commas as parameter separators (e.g., '=SUMIF(A1:A3,\"Alice\",B1:B3)')."
                     }
                 },
                 "required": [
@@ -348,7 +348,7 @@
                     },
                     "data_range": {
                         "type": "string",
-                        "description": "Range containing the data for the chart, in the format of 'A1:B10'"
+                        "description": "Range containing the data for the chart. Supports a single contiguous range (e.g., 'A1:B10'), multiple non-contiguous ranges separated by commas (e.g., 'A1:A10,C1:C10'), and cross-sheet references (e.g., 'Sheet1.A1:C11'). Cross-sheet and non-contiguous ranges can be combined (e.g., 'Sheet1.A1:A10,Sheet1.C1:C10')."
                     },
                     "title": {
                         "type": "string",
